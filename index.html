@@ -112,11 +112,11 @@ function render(){const el=document.getElementById('app');if(STATE.page==='login
 
 async function loadClasses(){
     try{const r=await fetch('/api/classes');CLASSES=await r.json()}catch(e){CLASSES=[]}
+    render();  // 先渲染页面，让下拉框DOM存在
     try{const r=await fetch('/api/categories');const cats=await r.json();
         const sel=document.getElementById('categorySelect');
-        cats.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=`${c.name}（${c.count}题）`;sel.appendChild(o)});
+        if(sel){cats.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name+'（'+c.count+'题）';sel.appendChild(o)})}
     }catch(e){}
-    render();
 }
 function updateCategoryHint(){
     const v=document.getElementById('categorySelect').value;
