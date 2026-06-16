@@ -93,13 +93,35 @@ body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg)
 
 <script>
 const STATE={page:'login',name:'',studentClass:'',questions:[],answers:{},startTime:0,timeLimit:3600,timer:null,result:null,activeTab:'review'};
-let CLASSES=[];
+let CLASSES=[],EXAM_MODE=false;
+
+function switchMode(mode){
+    EXAM_MODE=(mode==='exam');
+    document.getElementById('modeQuiz').style.background=EXAM_MODE?'transparent':'var(--accent)';
+    document.getElementById('modeQuiz').style.border=EXAM_MODE?'1px solid var(--accent)':'none';
+    document.getElementById('modeQuiz').style.color=EXAM_MODE?'var(--accent)':'#fff';
+    document.getElementById('modeExam').style.background=EXAM_MODE?'var(--accent)':'transparent';
+    document.getElementById('modeExam').style.border=EXAM_MODE?'none':'1px solid var(--accent)';
+    document.getElementById('modeExam').style.color=EXAM_MODE?'#fff':'var(--accent)';
+    document.getElementById('examCodeGroup').style.display=EXAM_MODE?'block':'none';
+    document.getElementById('startBtn').textContent=EXAM_MODE?'加入考试':'开始答题';
+}
 
 // ====== Render ======
 function render(){const el=document.getElementById('app');if(STATE.page==='login')el.innerHTML=renderLogin();else if(STATE.page==='quiz')el.innerHTML=renderQuiz();else if(STATE.page==='result')el.innerHTML=renderResult()}
 
 async function loadClasses(){
-    try{const r=await fetch('/api/classes');CLASSES=await r.json();render()}catch(e){CLASSES=[];render()}
+    try{const r=await fetch('/api/classes');CLASSES=await r.json()}catch(e){CLASSES=[]}
+    try{const r=await fetch('/api/categories');const cats=await r.json();
+        const sel=document.getElementById('categorySelect');
+        cats.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=`${c.name}（${c.count}题）`;sel.appendChild(o)});
+    }catch(e){}
+    render();
+}
+function updateCategoryHint(){
+    const v=document.getElementById('categorySelect').value;
+    const h=document.getElementById('categoryHint');
+    if(v==='all'){h.style.display='none'}else{h.style.display='block';h.textContent='该分类题目数量有限，随机抽取25题'}
 }
 
 function renderLogin(){
@@ -111,6 +133,16 @@ function renderLogin(){
             <div class="info-box">📋 考试须知：共25题(5分/题=125分满分)·60分钟·提交秒出分+详细解析·及格线75分(60%)</div>
             <div class="input-group"><label>👤 姓名</label><input type="text" id="nameInput" placeholder="输入姓名..." maxlength="20"></div>
             <div class="input-group"><label>🏫 班级</label><select id="classSelect"><option value="">-- 请选择班级 --</option>${opts}</select></div>
+            <div class="input-group"><label>📂 选题范围</label><select id="categorySelect" onchange="updateCategoryHint()"><option value="all">全部题库（500题随机）</option></select></div>
+            <div id="categoryHint" style="font-size:11px;color:var(--light);margin-bottom:4px;text-align:left;display:none"></div>
+            <div class="mode-switch" style="display:flex;gap:8px;margin-bottom:16px">
+                <button class="btn btn-sm" id="modeQuiz" style="flex:1;background:var(--accent);color:#fff" onclick="switchMode('quiz')">📝 练习模式</button>
+                <button class="btn btn-sm" id="modeExam" style="flex:1;background:transparent;border:1px solid var(--accent);color:var(--accent)" onclick="switchMode('exam')">📋 考试模式</button>
+            </div>
+            <div id="examCodeGroup" style="display:none;margin-bottom:16px;text-align:left">
+                <label style="font-size:13px;color:var(--light)">🔑 考试码</label>
+                <input type="text" id="examCodeInput" placeholder="老师给的6位考试码..." maxlength="6" style="text-transform:uppercase;letter-spacing:4px;font-size:20px;text-align:center;font-weight:bold;width:100%;padding:10px;border-radius:7px;border:2px solid var(--accent);background:var(--bg);color:var(--yellow);outline:none">
+            </div>
             <button class="btn btn-primary" id="startBtn" onclick="startQuiz()">开始答题</button>
         </div>
     </div>`;
@@ -119,17 +151,36 @@ function renderLogin(){
 async function startQuiz(){
     const name=document.getElementById('nameInput').value.trim();
     const cls=document.getElementById('classSelect').value;
+    const cat=document.getElementById('categorySelect').value;
     if(!name){alert('请输入姓名');return}
     if(!cls){alert('请选择班级');return}
     const btn=document.getElementById('startBtn');btn.disabled=true;btn.textContent='加载中...';
-    try{
-        let r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,class:cls})});
-        let d=await r.json();if(!d.success)throw new Error(d.error);
-        STATE.name=d.name;STATE.studentClass=d.class;
-        r=await fetch('/api/questions');d=await r.json();
-        STATE.questions=d.questions;STATE.answers={};STATE.startTime=Date.now();STATE.timeLimit=d.config.timeLimit*60;STATE.remainingTime=STATE.timeLimit;
-        STATE.page='quiz';STATE.result=null;render();startTimer();
-    }catch(e){alert('失败: '+e.message);btn.disabled=false;btn.textContent='开始答题'}
+    const catParam=cat&&cat!=='all'?`?category=${encodeURIComponent(cat)}`:'';
+
+    if(EXAM_MODE){
+        // 考试模式：加入考试
+        const code=document.getElementById('examCodeInput').value.trim().toUpperCase();
+        if(!code||code.length<4){alert('请输入老师给的考试码');btn.disabled=false;btn.textContent='加入考试';return}
+        btn.textContent='加入考试中...';
+        try{
+            let r=await fetch('/api/student/join-exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,name,class:cls})});
+            let d=await r.json();if(!d.success)throw new Error(d.error);
+            STATE.name=d.name;STATE.studentClass=cls;STATE.examCode=d.code;STATE.isExam=true;
+            r=await fetch('/api/exam/questions');d=await r.json();
+            STATE.questions=d.questions;STATE.answers={};STATE.startTime=Date.now();STATE.timeLimit=d.config.timeLimit*60;STATE.remainingTime=STATE.timeLimit;
+            STATE.page='quiz';STATE.result=null;render();startTimer();
+        }catch(e){alert('加入失败: '+e.message);btn.disabled=false;btn.textContent='加入考试'}
+    }else{
+        // 练习模式
+        try{
+            let r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,class:cls})});
+            let d=await r.json();if(!d.success)throw new Error(d.error);
+            STATE.name=d.name;STATE.studentClass=d.class;STATE.isExam=false;
+            r=await fetch('/api/questions'+catParam);d=await r.json();
+            STATE.questions=d.questions;STATE.answers={};STATE.startTime=Date.now();STATE.timeLimit=d.config.timeLimit*60;STATE.remainingTime=STATE.timeLimit;
+            STATE.page='quiz';STATE.result=null;render();startTimer();
+        }catch(e){alert('失败: '+e.message);btn.disabled=false;btn.textContent='开始答题'}
+    }
 }
 
 function startTimer(){
@@ -184,8 +235,9 @@ function confirmSubmit(){
 }
 async function submitQuiz(){
     clearInterval(STATE.timer);
+    const url=STATE.isExam?'/api/exam/submit':'/api/submit';
     try{
-        const r=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers:STATE.answers})});
+        const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers:STATE.answers})});
         STATE.result=await r.json();STATE.page='result';render();
     }catch(e){alert('提交失败: '+e.message)}
 }

@@ -115,7 +115,8 @@ function renderDashboard(){
     <div class="stats-grid" id="statsGrid"></div>
     <div class="tabs" id="mainTabs">
         <div class="tab active" onclick="switchMainTab('dashboard')">📊 概览</div>
-        <div class="tab" onclick="switchMainTab('scores')">📋 成绩</div>
+        <div class="tab" onclick="switchMainTab('exam')">📋 考试管理</div>
+        <div class="tab" onclick="switchMainTab('scores')">📊 成绩</div>
         <div class="tab" onclick="switchMainTab('classes')">🏫 班级对比</div>
         <div class="tab" onclick="switchMainTab('questions')">❌ 高频错题</div>
         <div class="tab" onclick="switchMainTab('categories')">📈 知识薄弱</div>
@@ -140,6 +141,7 @@ async function switchMainTab(tab){
     document.querySelectorAll('#mainTabs .tab').forEach(t=>t.classList.toggle('active',t===t.currentTarget?t===event.target:t.textContent.includes(tab==='dashboard'?'概览':tab==='scores'?'成绩':tab==='classes'?'班级':tab==='questions'?'错题':'薄弱')));
     const el=document.getElementById('mainContent');
     if(tab==='dashboard')await loadDashboardTab(el);
+    else if(tab==='exam')await loadExamTab(el);
     else if(tab==='scores')await loadScoresTab(el);
     else if(tab==='classes')await loadClassesTab(el);
     else if(tab==='questions')await loadQuestionsTab(el);
@@ -225,6 +227,78 @@ async function loadCategoriesTab(el){
         <table><thead><tr><th>知识分类</th><th>答题总数</th><th>正确率</th><th>建议</th></tr></thead><tbody>
         ${data.map(d=>`<tr><td>${d.name}</td><td>${d.total}</td><td>${d.accuracy}%</td><td>${d.accuracy>=80?'✅ 掌握良好':d.accuracy>=60?'⚠ 需加强' :'🔴 重点补习'}</td></tr>`).join('')}</tbody></table>`;
     }catch(e){el.innerHTML='<div class="empty">加载失败</div>'}
+}
+
+async function loadExamTab(el){
+    let catsHTML='<option value="">全部题库</option>';
+    try{const r=await fetch('/api/categories');const cats=await r.json();
+        cats.forEach(c=>{catsHTML+=`<option value="${c.name}">${c.name}（${c.count}题）</option>`});
+    }catch(e){}
+
+    el.innerHTML=`
+    <div style="background:var(--bg2);padding:20px;border-radius:10px;margin-bottom:16px">
+        <h3 style="margin-bottom:12px">🔨 创建考试</h3>
+        <div class="filter-bar">
+            <select id="examCategory" style="flex:1">${catsHTML}</select>
+            <select id="examCount" style="width:100px"><option value="25">25题</option><option value="20">20题</option><option value="30">30题</option><option value="50">50题</option></select>
+            <button class="btn btn-green" onclick="createExam()" style="padding:10px 20px;font-size:14px">📋 生成考试码</button>
+        </div>
+        <p style="font-size:11px;color:var(--light);margin-top:8px">考试码生成后发给学生，学生选择"考试模式"输入代码即可加入。同一考试码的同学做同一套题。</p>
+    </div>
+    <div id="examResult" style="margin-top:10px"></div>
+    <h3 style="margin:16px 0">📋 进行中的考试</h3>
+    <div id="examSessionsList" class="loading">加载中...</div>`;
+    await refreshExamSessions();
+}
+
+async function createExam(){
+    const cat=document.getElementById('examCategory').value;
+    const count=parseInt(document.getElementById('examCount').value);
+    try{
+        const r=await fetch('/api/teacher/create-exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:cat||'',count})});
+        const d=await r.json();
+        document.getElementById('examResult').innerHTML=`
+        <div style="background:rgba(92,184,92,0.15);border:1px solid var(--green);border-radius:10px;padding:20px;text-align:center">
+            <div style="font-size:48px;font-weight:bold;color:var(--yellow);letter-spacing:8px;margin:10px 0">${d.code}</div>
+            <p style="color:var(--light)">${d.questionCount}题 · ${d.totalScore}分 · ${d.category}</p>
+            <p style="font-size:12px;color:var(--light)">把这个考试码发给学生，学生选"考试模式"输入即可</p>
+            <button class="btn btn-green" onclick="navigator.clipboard.writeText('${d.code}');alert('考试码已复制！')">📋 复制考试码</button>
+            <button class="btn btn-outline btn-sm" onclick="refreshExamSessions()">🔄 刷新列表</button>
+        </div>`;
+        await refreshExamSessions();
+    }catch(e){alert('创建失败: '+e.message)}
+}
+
+async function refreshExamSessions(){
+    const el=document.getElementById('examSessionsList');
+    try{
+        const r=await fetch('/api/teacher/exam-sessions');const sessions=await r.json();
+        if(!sessions.length){el.innerHTML='<div class="empty">暂无进行中的考试</div>';return}
+        el.innerHTML=sessions.map(s=>`
+        <div style="background:var(--bg2);padding:12px;border-radius:8px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <div><strong style="font-size:18px;color:var(--yellow);letter-spacing:4px">${s.code}</strong>
+            <span style="font-size:12px;color:var(--light);margin-left:10px">${new Date(s.createdAt).toLocaleString('zh-CN')}</span></div>
+            <div style="font-size:13px;color:var(--light)">${s.questionCount}题 · ${s.studentCount}人已加入</div>
+            <button class="btn btn-accent btn-sm" onclick="viewExamResults('${s.code}')">查看成绩</button>
+        </div>`).join('');
+    }catch(e){el.innerHTML='<div class="empty">加载失败</div>'}
+}
+
+async function viewExamResults(code){
+    try{
+        const r=await fetch('/api/teacher/exam-results/'+code);const d=await r.json();
+        const submitted=d.students.filter(s=>s.submitted);
+        const avg=submitted.length>0?Math.round(submitted.reduce((a,b)=>a+b.percentage,0)/submitted.length):0;
+        let html=`<div style="background:var(--bg2);padding:14px;border-radius:8px;margin-bottom:10px">
+            <strong>考试码: ${d.code}</strong> | ${d.questionCount}题${d.totalScore}分 | 已交卷${submitted.length}/${d.students.length}人 | 平均${avg}%
+        </div>`;
+        if(!d.students.length){html+='<div class="empty">暂无考生加入</div>'}
+        else{html+=`<table><thead><tr><th>姓名</th><th>班级</th><th>分数</th><th>正确率</th><th>用时</th><th>状态</th></tr></thead><tbody>
+            ${d.students.map(s=>`<tr><td>${s.name}</td><td>${s.class}</td><td>${s.score||'-'}</td><td>${s.percentage||'-'}%</td><td>${s.timeUsed?Math.floor(s.timeUsed/60)+'分'+s.timeUsed%60+'秒':'-'}</td><td>${s.submitted?'✅已交':'⏳未交'}</td></tr>`).join('')}
+        </tbody></table>`;}
+        document.getElementById('examResult').innerHTML=html;
+        document.getElementById('examResult').scrollIntoView({behavior:'smooth'});
+    }catch(e){alert('加载失败')}
 }
 
 function exportCSV(){

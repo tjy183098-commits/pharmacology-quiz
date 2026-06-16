@@ -24,6 +24,24 @@ const CONFIG = {
     classes: CLASSES,
 };
 
+// ====== 考试模式：题库会话存储 ======
+const examSessions = {}; // { code: { questions, students: { name: { class, startTime, answers } }, createdAt, teacher } }
+
+// 定期清理超过24小时的考试
+setInterval(() => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    Object.keys(examSessions).forEach(code => {
+        if (examSessions[code].createdAt < cutoff) delete examSessions[code];
+    });
+}, 60 * 60 * 1000);
+
+function generateExamCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+}
+
 app.use(express.json());
 app.use(express.static(__dirname));
 app.use(session({
@@ -37,8 +55,11 @@ let questionBank = [];
 try { questionBank = JSON.parse(fs.readFileSync(path.join(__dirname, 'questions.json'), 'utf-8')); }
 catch (e) { console.error('题库加载失败:', e.message); }
 function getActiveQuestions() { return questionBank.filter(q => q.status === 'ready'); }
-function getRandomQuestions(count) {
-    const active = getActiveQuestions();
+function getRandomQuestions(count, category) {
+    let active = getActiveQuestions();
+    if (category && category !== 'all') {
+        active = active.filter(q => q.category === category);
+    }
     const shuffled = [...active].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, Math.min(count, shuffled.length)).map(({ id, question, options, category }) =>
         ({ id, question, options, category }));
@@ -88,10 +109,11 @@ app.get('/api/questions', (req, res) => {
     if (!req.session.loggedIn) return res.status(401).json({ error: '请先登录' });
     const active = getActiveQuestions();
     if (active.length < CONFIG.quiz.perQuiz) return res.status(500).json({ error: `题库不足，当前${active.length}题` });
-    const questions = getRandomQuestions(CONFIG.quiz.perQuiz);
+    const category = req.query.category || '';
+    const questions = getRandomQuestions(CONFIG.quiz.perQuiz, category);
     req.session.questions = questions;
     req.session.startTime = Date.now();
-    res.json({ questions, config: CONFIG.quiz, name: req.session.name, class: req.session.studentClass });
+    res.json({ questions, config: CONFIG.quiz, name: req.session.name, class: req.session.studentClass, category: category || '全部' });
 });
 
 // ====== 提交答卷 ======
@@ -356,6 +378,16 @@ app.get('/api/stats/categories', requireTeacher, (req, res) => {
 });
 
 // ====== 概览统计 ======
+// ====== 分类题库 ======
+app.get('/api/categories', (req, res) => {
+    const active = getActiveQuestions();
+    const cats = {};
+    active.forEach(q => { cats[q.category] = (cats[q.category] || 0) + 1; });
+    const list = Object.entries(cats).map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count);
+    res.json(list);
+});
+
 app.get('/api/stats', (req, res) => {
     const active = getActiveQuestions(); const draft = questionBank.filter(q => q.status === 'draft');
     const categories = {}; active.forEach(q => { categories[q.category] = (categories[q.category]||0)+1; });
@@ -376,6 +408,170 @@ app.delete('/api/scores', requireTeacher, (req, res) => {
         if (fs.existsSync(p)) fs.unlinkSync(p);
     });
     res.json({ success: true });
+});
+
+// ====== 考试模式：教师创建考试 ======
+app.post('/api/teacher/create-exam', requireTeacher, (req, res) => {
+    const { category, count } = req.body;
+    const questionCount = Math.min(parseInt(count) || CONFIG.quiz.perQuiz, 50);
+    const code = generateExamCode();
+    const questions = getRandomQuestions(questionCount, category || '');
+    examSessions[code] = {
+        code,
+        questions,
+        students: {},
+        createdAt: Date.now(),
+        questionCount: questions.length,
+        totalScore: questions.length * CONFIG.quiz.pointsPerQuestion,
+        pointsPerQuestion: CONFIG.quiz.pointsPerQuestion,
+        category: category || '全部'
+    };
+    console.log(`考试创建: ${code} | ${questions.length}题 | ${category || '全部'}`);
+    res.json({
+        code,
+        questionCount: questions.length,
+        totalScore: questions.length * CONFIG.quiz.pointsPerQuestion,
+        link: `/exam?code=${code}`,
+        category: category || '全部'
+    });
+});
+
+// ====== 考试模式：教师查看考试列表 ======
+app.get('/api/teacher/exam-sessions', requireTeacher, (req, res) => {
+    const list = Object.values(examSessions).map(s => ({
+        code: s.code,
+        studentCount: Object.keys(s.students).length,
+        questionCount: s.questionCount,
+        createdAt: new Date(s.createdAt).toISOString(),
+        link: `/exam?code=${s.code}`
+    })).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    res.json(list);
+});
+
+// ====== 考试模式：教师查看某场考试结果 ======
+app.get('/api/teacher/exam-results/:code', requireTeacher, (req, res) => {
+    const session = examSessions[req.params.code];
+    if (!session) return res.status(404).json({ error: '考试不存在或已过期' });
+    const students = Object.entries(session.students).map(([name, data]) => ({
+        name,
+        class: data.class,
+        score: data.score,
+        correct: data.correct,
+        total: session.questionCount,
+        percentage: data.percentage,
+        timeUsed: data.timeUsed,
+        submitted: !!data.submittedAt,
+        date: data.submittedAt ? new Date(data.submittedAt).toISOString() : ''
+    })).sort((a, b) => {
+        if (a.submitted && !b.submitted) return 1;
+        if (!a.submitted && b.submitted) return -1;
+        return (b.percentage || 0) - (a.percentage || 0);
+    });
+    res.json({ code, students, questionCount: session.questionCount, totalScore: session.totalScore });
+});
+
+// ====== 考试模式：学生加入考试 ======
+app.post('/api/student/join-exam', (req, res) => {
+    const { code, name, class: studentClass } = req.body;
+    if (!code || !name || !studentClass) return res.status(400).json({ error: '缺少信息' });
+    const session = examSessions[code.toUpperCase()];
+    if (!session) return res.status(404).json({ error: '考试码无效或已过期' });
+    const cleanName = name.trim();
+    if (session.students[cleanName]) return res.status(400).json({ error: '你已加入过本场考试，不能重复加入' });
+
+    session.students[cleanName] = { class: studentClass, startTime: Date.now(), answers: {}, submittedAt: null };
+    req.session.examCode = code.toUpperCase();
+    req.session.examName = cleanName;
+    req.session.examClass = studentClass;
+    req.session.loggedIn = true;
+    req.session.name = cleanName;
+    req.session.studentClass = studentClass;
+    req.session.isExam = true;
+
+    res.json({
+        success: true,
+        name: cleanName,
+        code: code.toUpperCase(),
+        questionCount: session.questionCount,
+        totalScore: session.totalScore,
+        timeLimit: CONFIG.quiz.timeLimit
+    });
+});
+
+// ====== 考试模式：获取考题 ======
+app.get('/api/exam/questions', (req, res) => {
+    if (!req.session.isExam || !req.session.examCode) return res.status(401).json({ error: '请先加入考试' });
+    const session = examSessions[req.session.examCode];
+    if (!session) return res.status(404).json({ error: '考试已过期' });
+    res.json({
+        questions: session.questions.map(({ id, question, options, category }) => ({ id, question, options, category })),
+        config: { timeLimit: CONFIG.quiz.timeLimit, pointsPerQuestion: CONFIG.quiz.pointsPerQuestion, totalScore: CONFIG.quiz.totalScore },
+        name: req.session.examName,
+        code: req.session.examCode
+    });
+});
+
+// ====== 考试模式：提交答卷 ======
+app.post('/api/exam/submit', (req, res) => {
+    if (!req.session.isExam || !req.session.examCode) return res.status(401).json({ error: '请先加入考试' });
+    const session = examSessions[req.session.examCode];
+    if (!session) return res.status(404).json({ error: '考试已过期' });
+
+    const student = session.students[req.session.examName];
+    if (!student) return res.status(404).json({ error: '考生信息丢失' });
+    if (student.submittedAt) return res.status(400).json({ error: '你已提交过本场考试' });
+
+    const { answers } = req.body;
+    let correctCount = 0;
+    const results = session.questions.map(q => {
+        const studentAnswer = (answers[q.id] || '').toUpperCase();
+        const fullQ = questionBank.find(bq => bq.id === q.id);
+        const correctAnswer = fullQ ? fullQ.answer : '';
+        const isCorrect = studentAnswer === correctAnswer;
+        if (isCorrect) correctCount++;
+        return {
+            id: q.id, question: q.question, options: q.options,
+            studentAnswer, correctAnswer, isCorrect,
+            category: fullQ ? fullQ.category : '',
+            explanation: fullQ && fullQ.explanation ? fullQ.explanation : ''
+        };
+    });
+
+    const score = correctCount * CONFIG.quiz.pointsPerQuestion;
+    const totalTime = Math.round((Date.now() - student.startTime) / 1000);
+
+    // 更新考生记录
+    student.answers = req.body.answers;
+    student.score = score;
+    student.correct = correctCount;
+    student.total = session.questionCount;
+    student.percentage = Math.round(correctCount / session.questionCount * 100);
+    student.timeUsed = totalTime;
+    student.submittedAt = Date.now();
+    student.results = results;
+
+    // 保存到全局成绩
+    const record = {
+        name: req.session.examName,
+        class: req.session.examClass,
+        openid: `exam_${req.session.examCode}_${req.session.examName}`,
+        score, correct: correctCount, total: session.questionCount,
+        percentage: student.percentage,
+        timeUsed: totalTime,
+        date: new Date().toISOString(),
+        examCode: req.session.examCode,
+        weakness: [],
+        results
+    };
+    saveRecord(record);
+
+    res.json({
+        score, correct: correctCount, total: session.questionCount,
+        percentage: student.percentage, timeUsed: totalTime,
+        passed: score >= CONFIG.quiz.totalScore * 0.6,
+        weakness: record.weakness,
+        results
+    });
 });
 
 // ====== 页面路由 ======
