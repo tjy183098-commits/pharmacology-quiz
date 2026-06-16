@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>教师管理 - 药理答题系统</title>
+<style>
+:root{--bg:#0D2B4E;--bg2:#1A3D6B;--accent:#3D8CD9;--light:#6AB4E6;--white:#fff;--green:#5cb85c;--red:#d9534f;--yellow:#f5d14c;--orange:#f0ad4e}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--white);min-height:100vh}
+.container{max-width:1200px;margin:0 auto;padding:16px}
+.header{text-align:center;padding:20px 0;border-bottom:2px solid var(--accent);margin-bottom:20px}
+.header h1{font-size:24px;margin-bottom:4px}.header p{color:var(--light);font-size:13px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--bg2);border-radius:8px;padding:16px;text-align:center;border:1px solid rgba(255,255,255,0.08)}
+.stat-card .num{font-size:30px;font-weight:bold;color:var(--accent)}.stat-card .label{color:var(--light);font-size:11px;margin-top:4px}
+table{width:100%;border-collapse:collapse;background:var(--bg2);border-radius:8px;overflow:hidden;font-size:13px}
+th{background:var(--accent);padding:10px 12px;text-align:left;font-size:12px;white-space:nowrap}
+td{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px}
+tr:hover{background:rgba(61,140,217,0.08)}
+.badge{padding:3px 8px;border-radius:10px;font-size:11px;font-weight:bold}
+.badge-pass{background:var(--green);color:#fff}.badge-fail{background:var(--red);color:#fff}
+.btn{padding:7px 14px;border:none;border-radius:5px;cursor:pointer;font-size:12px;color:#fff;transition:.2s;margin:3px}
+.btn-accent{background:var(--accent)}.btn-green{background:var(--green)}.btn-red{background:var(--red)}.btn-yellow{background:var(--orange)}.btn-outline{background:transparent;border:1px solid var(--accent);color:var(--accent)}
+.btn:hover{opacity:.85;transform:translateY(-1px)}
+.filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.filter-bar select,.filter-bar input{padding:7px 10px;border-radius:5px;border:1px solid var(--accent);background:var(--bg);color:var(--white);font-size:12px}
+.loading{text-align:center;padding:40px;color:var(--light)}.empty{text-align:center;padding:30px;color:var(--light)}
+.tabs{display:flex;gap:0;margin-bottom:16px;border-radius:6px;overflow:hidden}
+.tab{padding:8px 16px;cursor:pointer;font-size:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);transition:.2s;text-align:center}
+.tab.active{background:var(--accent);border-color:var(--accent);font-weight:bold}.tab:hover:not(.active){background:rgba(61,140,217,0.15)}
+.bar-chart{display:flex;align-items:end;gap:4px;height:120px;margin:10px 0;padding:0 4px}
+.bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.bar{width:100%;max-width:40px;border-radius:3px 3px 0 0;transition:.3s;min-height:2px;position:relative}
+.bar.green{background:var(--green)}.bar.yellow{background:var(--orange)}.bar.red{background:var(--red)}
+.bar-label{font-size:9px;color:var(--light);margin-top:3px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.bar-val{font-size:9px;color:var(--yellow);margin-bottom:2px}
+
+/* Login */
+.login-wrap{max-width:380px;margin:80px auto;background:var(--bg2);border-radius:12px;padding:32px;border:1px solid rgba(255,255,255,0.1);text-align:center}
+.login-wrap h2{margin-bottom:4px}.login-wrap .sub{color:var(--light);font-size:12px;margin-bottom:20px}
+.login-wrap input{width:100%;padding:10px 14px;border-radius:6px;border:1px solid var(--accent);background:var(--bg);color:var(--white);font-size:14px;outline:none;margin-bottom:12px}
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:1000;overflow-y:auto;padding:20px}
+.modal-overlay.show{display:flex;align-items:flex-start;justify-content:center}
+.modal-content{background:var(--bg);border-radius:12px;max-width:850px;width:100%;margin:20px auto;border:1px solid var(--accent);position:relative}
+.modal-header{background:var(--bg2);padding:16px 20px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10}
+.modal-header h2{font-size:18px}.modal-close{font-size:28px;cursor:pointer;color:var(--light);line-height:1;padding:0 6px}.modal-close:hover{color:var(--red)}
+.modal-body{padding:20px;max-height:70vh;overflow-y:auto}
+.modal-body .stats-grid{grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.modal-body .stat-card{padding:12px}.modal-body .stat-card .num{font-size:24px}
+.clickable{color:var(--accent);cursor:pointer;text-decoration:underline}.clickable:hover{color:var(--yellow)}
+.trend-chart{display:flex;align-items:end;gap:3px;height:80px;margin:8px 0}
+.trend-bar{flex:1;border-radius:2px 2px 0 0;min-height:3px;transition:.2s;cursor:pointer;position:relative}
+.trend-bar:hover{opacity:.7}
+.trend-bar.green{background:var(--green)}.trend-bar.yellow{background:var(--orange)}.trend-bar.red{background:var(--red)}
+.mistake-item{background:rgba(217,83,79,0.08);border-left:3px solid var(--red);padding:8px 12px;margin:6px 0;border-radius:0 6px 6px 0;font-size:12px}
+.wrong-answer{color:var(--red);text-decoration:line-through;margin-right:4px}
+.correct-answer{color:var(--green);font-weight:bold}
+</style>
+</head>
+<body><div class="container" id="app"><div class="loading">加载中...</div></div>
+
+<div class="modal-overlay" id="studentModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">学生详情</h2>
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+let loggedIn=false,activeTab='dashboard',allScores=[],allStats=null;
+
+async function init(){
+    const r=await fetch('/api/stats');allStats=await r.json();
+    if(!loggedIn){document.getElementById('app').innerHTML=renderLogin()}else{await loadData();renderDashboard()}
+}
+
+function renderLogin(){
+    return`<div class="login-wrap">
+        <h2>🔐 教师登录</h2><p class="sub">动物药理在线答题系统</p>
+        <input type="text" id="tUsername" placeholder="用户名"><br>
+        <input type="password" id="tPassword" placeholder="密码" onkeydown="if(event.key==='Enter')teacherLogin()"><br>
+        <button class="btn btn-accent" onclick="teacherLogin()" style="width:100%;padding:10px">登 录</button>
+        <p style="margin-top:12px;font-size:11px;color:var(--light)">默认账号: admin / pharma2026</p>
+    </div>`;
+}
+
+async function teacherLogin(){
+    const u=document.getElementById('tUsername').value.trim(),p=document.getElementById('tPassword').value.trim();
+    if(!u||!p){alert('请输入账号密码');return}
+    try{
+        const r=await fetch('/api/teacher/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+        const d=await r.json();
+        if(d.success){loggedIn=true;await loadData();renderDashboard()}else{alert(d.error)}
+    }catch(e){alert('登录失败')}
+}
+
+async function teacherLogout(){
+    await fetch('/api/teacher/logout',{method:'POST'});
+    loggedIn=false;renderLogin();
+}
+
+async function loadData(){
+    try{const r=await fetch('/api/scores');allScores=await r.json()}catch(e){allScores=[]}
+    try{const r=await fetch('/api/stats');allStats=await r.json()}catch(e){}
+}
+
+function renderDashboard(){
+    document.getElementById('app').innerHTML=`
+    <div class="header"><h1>📊 教师管理后台</h1><p>${allStats?.totalExams||0}次答题 · ${allStats?.uniqueStudents||0}名学生 · ${allStats?.active||0}道可用题</p></div>
+    <div class="stats-grid" id="statsGrid"></div>
+    <div class="tabs" id="mainTabs">
+        <div class="tab active" onclick="switchMainTab('dashboard')">📊 概览</div>
+        <div class="tab" onclick="switchMainTab('scores')">📋 成绩</div>
+        <div class="tab" onclick="switchMainTab('classes')">🏫 班级对比</div>
+        <div class="tab" onclick="switchMainTab('questions')">❌ 高频错题</div>
+        <div class="tab" onclick="switchMainTab('categories')">📈 知识薄弱</div>
+    </div>
+    <div id="mainContent"></div>`;
+    loadStatsGrid();
+    switchMainTab('dashboard');
+}
+
+async function loadStatsGrid(){
+    const g=document.getElementById('statsGrid');
+    g.innerHTML=`<div class="stat-card"><div class="num">${allStats?.total||0}</div><div class="label">题库总数</div></div>
+    <div class="stat-card"><div class="num">${allStats?.active||0}</div><div class="label">可用题目</div></div>
+    <div class="stat-card"><div class="num">${allStats?.totalExams||0}</div><div class="label">答题人次</div></div>
+    <div class="stat-card"><div class="num">${allStats?.uniqueStudents||0}</div><div class="label">参与学生</div></div>
+    <div class="stat-card"><div class="num">${allStats?.avgScore||0}%</div><div class="label">平均正确率</div></div>
+    <div class="stat-card"><div class="num">${allStats?.passRate||0}%</div><div class="label">及格率(≥60%)</div></div>`;
+}
+
+async function switchMainTab(tab){
+    activeTab=tab;
+    document.querySelectorAll('#mainTabs .tab').forEach(t=>t.classList.toggle('active',t===t.currentTarget?t===event.target:t.textContent.includes(tab==='dashboard'?'概览':tab==='scores'?'成绩':tab==='classes'?'班级':tab==='questions'?'错题':'薄弱')));
+    const el=document.getElementById('mainContent');
+    if(tab==='dashboard')await loadDashboardTab(el);
+    else if(tab==='scores')await loadScoresTab(el);
+    else if(tab==='classes')await loadClassesTab(el);
+    else if(tab==='questions')await loadQuestionsTab(el);
+    else if(tab==='categories')await loadCategoriesTab(el);
+}
+
+async function loadDashboardTab(el){
+    const catCount=allStats?.categories?Object.keys(allStats.categories).length:0;
+    el.innerHTML=`<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+        <div class="stat-card"><div class="num">${catCount}</div><div class="label">知识分类</div></div>
+        <div class="stat-card"><div class="num">${allStats?.draft||0}</div><div class="label">待完善题目</div></div>
+    </div>
+    <div style="background:var(--bg2);padding:16px;border-radius:8px;line-height:2;font-size:13px">
+        <p>📁 <strong>题库分类统计：</strong></p>
+        ${Object.entries(allStats?.categories||{}).map(([k,v])=>`<span style="display:inline-block;background:rgba(61,140,217,0.2);padding:3px 8px;border-radius:4px;margin:3px;font-size:11px">${k}: ${v}题</span>`).join('')}
+        <hr style="border-color:rgba(255,255,255,0.1);margin:12px 0">
+        <p>🔑 <strong>快捷操作：</strong></p>
+        <button class="btn btn-green" onclick="exportCSV()">📥 导出全部成绩CSV</button>
+        <button class="btn btn-outline" onclick="switchMainTab('scores')">📋 查看成绩列表</button>
+        <button class="btn btn-outline" onclick="switchMainTab('classes')">🏫 班级对比分析</button>
+        <button class="btn btn-red btn-sm" onclick="clearAll()" style="margin-left:10px">🗑 清空全部记录</button>
+    </div>`;
+}
+
+async function loadScoresTab(el){
+    const classes=[...new Set(allScores.map(s=>s.class||'未知'))].sort();
+    const opts=classes.map(c=>`<option value="${c}">${c}</option>`).join('');
+    el.innerHTML=`<div class="filter-bar">
+        <select id="scoreClassFilter" onchange="renderScoreTable()"><option value="">全部班级</option>${opts}</select>
+        <input type="text" id="scoreNameFilter" placeholder="🔍 搜索姓名..." oninput="renderScoreTable()">
+        <button class="btn btn-green" onclick="exportCSV()">📥 导出CSV</button>
+    </div><div id="scoreTableArea" class="loading">加载中...</div>`;
+    renderScoreTable();
+}
+
+function renderScoreTable(){
+    const cls=document.getElementById('scoreClassFilter')?.value||'';
+    const name=(document.getElementById('scoreNameFilter')?.value||'').toLowerCase();
+    let data=allScores;if(cls)data=data.filter(s=>s.class===cls);if(name)data=data.filter(s=>s.name.toLowerCase().includes(name));
+    data.sort((a,b)=>b.date.localeCompare(a.date));
+    if(!data.length){document.getElementById('scoreTableArea').innerHTML='<div class="empty">暂无记录</div>';return}
+    const avgPct=Math.round(data.reduce((a,b)=>a+b.percentage,0)/data.length);
+    const pass=data.filter(s=>s.percentage>=60).length;
+    document.getElementById('scoreTableArea').innerHTML=`
+    <div class="stats-grid" style="margin-bottom:10px;grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
+        <div class="stat-card"><div class="num">${data.length}</div><div class="label">记录数</div></div>
+        <div class="stat-card"><div class="num">${avgPct}%</div><div class="label">平均正确率</div></div>
+        <div class="stat-card"><div class="num">${pass}/${data.length}</div><div class="label">及格人数</div></div>
+    </div>
+    <table><thead><tr><th>姓名</th><th>班级</th><th>分数</th><th>正确</th><th>正确率</th><th>用时</th><th>日期</th><th>结果</th><th>薄弱点</th></tr></thead><tbody>
+    ${data.map(s=>`<tr><td><span class="clickable" onclick="showStudentDetail('${s.name.replace(/'/g,"\\'")}','${(s.class||'').replace(/'/g,"\\'")}')">${s.name}</span></td><td>${s.class||''}</td><td>${s.score}</td><td>${s.correct}/${s.total}</td><td>${s.percentage}%</td><td>${Math.floor(s.timeUsed/60)}分${s.timeUsed%60}秒</td><td>${s.date}</td><td><span class="badge ${s.percentage>=60?'badge-pass':'badge-fail'}">${s.percentage>=60?'及格':'不及格'}</span></td><td>${s.weakness?s.weakness.map(w=>`<span style="color:var(--red);font-size:10px">${w.category}${w.rate}%</span>`).join(' '):'-'}</td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function loadClassesTab(el){
+    try{
+        const r=await fetch('/api/stats/class-compare');const data=await r.json();
+        const maxExam=Math.max(...data.map(d=>d.exams),1);
+        el.innerHTML=`<div style="background:var(--bg2);padding:16px;border-radius:8px;margin-bottom:12px;font-size:12px">
+            <strong>📊 各班级答题对比</strong>（柱状图=答题人次，数字=平均正确率%）</div>
+        <div class="bar-chart">${data.map(d=>`<div class="bar-wrap"><div class="bar-val">${d.avgScore>0?d.avgScore+'%':''}</div><div class="bar ${d.avgScore>=80?'green':d.avgScore>=60?'yellow':'red'}" style="height:${Math.max(d.exams/maxExam*100,2)}px;max-width:50px"></div><div class="bar-label">${d.name.replace('畜牧兽医','畜医').replace('动物医学','动医')}</div></div>`).join('')}</div>
+        <table><thead><tr><th>班级</th><th>答题人次</th><th>参与学生</th><th>平均正确率</th><th>评价</th></tr></thead><tbody>
+        ${data.map(d=>`<tr><td>${d.name}</td><td>${d.exams}</td><td>${d.students}</td><td>${d.avgScore>0?d.avgScore+'%':'-'}</td><td>${d.avgScore>=80?'⭐优秀':d.avgScore>=60?'👍良好':d.exams>0?'💪需加强':'尚无数据'}</td></tr>`).join('')}</tbody></table>`;
+    }catch(e){el.innerHTML='<div class="empty">加载失败</div>'}
+}
+
+async function loadQuestionsTab(el){
+    try{
+        const r=await fetch('/api/stats/questions');const data=await r.json();
+        if(!data.length){el.innerHTML='<div class="empty">暂无答题数据</div>';return}
+        el.innerHTML=`<p style="font-size:12px;color:var(--light);margin-bottom:10px">📌 错误率最高的30道题（学生容易出错的知识点）</p>
+        <table><thead><tr><th>#</th><th>题目</th><th>分类</th><th>答题次数</th><th>错误率</th></tr></thead><tbody>
+        ${data.map((d,i)=>`<tr><td>${i+1}</td><td>${d.question}</td><td>${d.category}</td><td>${d.total}</td><td><span style="color:${d.errorRate>=70?'var(--red)':d.errorRate>=40?'var(--orange)':'var(--yellow)'}">${d.errorRate}%</span></td></tr>`).join('')}</tbody></table>`;
+    }catch(e){el.innerHTML='<div class="empty">加载失败</div>'}
+}
+
+async function loadCategoriesTab(el){
+    try{
+        const r=await fetch('/api/stats/categories');const data=await r.json();
+        if(!data.length){el.innerHTML='<div class="empty">暂无数据</div>';return}
+        el.innerHTML=`<p style="font-size:12px;color:var(--light);margin-bottom:10px">📌 各知识分类正确率（从低到高排列）</p>
+        <div class="bar-chart" style="height:150px">${data.map(d=>`<div class="bar-wrap"><div class="bar-val">${d.accuracy}%</div><div class="bar ${d.accuracy>=80?'green':d.accuracy>=60?'yellow':'red'}" style="height:${Math.max(d.accuracy/100*130,3)}px;max-width:60px"></div><div class="bar-label">${d.name}</div></div>`).join('')}</div>
+        <table><thead><tr><th>知识分类</th><th>答题总数</th><th>正确率</th><th>建议</th></tr></thead><tbody>
+        ${data.map(d=>`<tr><td>${d.name}</td><td>${d.total}</td><td>${d.accuracy}%</td><td>${d.accuracy>=80?'✅ 掌握良好':d.accuracy>=60?'⚠ 需加强' :'🔴 重点补习'}</td></tr>`).join('')}</tbody></table>`;
+    }catch(e){el.innerHTML='<div class="empty">加载失败</div>'}
+}
+
+function exportCSV(){
+    const cls=document.getElementById('scoreClassFilter')?.value||'';
+    window.open(`/api/scores/export${cls?`?class=${encodeURIComponent(cls)}`:''}`);
+}
+
+async function clearAll(){if(!confirm('确定清空所有成绩记录？不可恢复！'))return;await fetch('/api/scores',{method:'DELETE'});alert('已清空');await loadData();renderDashboard()}
+
+async function showStudentDetail(name, cls) {
+    const overlay = document.getElementById('studentModal');
+    const body = document.getElementById('modalBody');
+    document.getElementById('modalTitle').textContent = `📋 ${name} - ${cls}`;
+    overlay.classList.add('show');
+    body.innerHTML = '<div class="loading">加载中...</div>';
+
+    try {
+        const r = await fetch(`/api/teacher/student-detail?name=${encodeURIComponent(name)}&class=${encodeURIComponent(cls)}`);
+        const d = await r.json();
+        if (!d.found) { body.innerHTML = '<div class="empty">未找到该学生记录</div>'; return; }
+
+        // 趋势条
+        const maxPct = Math.max(...d.trend.map(t => t.percentage), 1);
+        const trendBars = d.trend.map(t => `
+            <div class="trend-bar ${t.percentage >= 80 ? 'green' : t.percentage >= 60 ? 'yellow' : 'red'}"
+                 style="height:${Math.max(t.percentage/maxPct*70, 4)}px"
+                 title="${t.date}: ${t.percentage}% (${t.score}分)"></div>`).join('');
+
+        // 薄弱点
+        const weakTags = d.weakness.map(w => `
+            <span style="display:inline-block;background:${w.accuracy<60?'rgba(217,83,79,0.2)':'rgba(240,173,78,0.2)'};color:${w.accuracy<60?'var(--red)':'var(--orange)'};padding:3px 8px;border-radius:10px;margin:2px;font-size:11px">
+                ${w.category}: ${w.accuracy}%</span>`).join('');
+
+        // 高频错题
+        const mistakes = d.frequentMistakes.map((m, i) => `
+            <div class="mistake-item">
+                <strong>${i+1}.</strong> [${m.category}] ${m.question.substring(0, 80)}${m.question.length > 80 ? '...' : ''}
+                <span style="color:var(--red);font-weight:bold;margin-left:8px">错${m.count}次</span>
+            </div>`).join('');
+
+        // 最近答题
+        const recentRows = d.recentExams.map(e => `
+            <tr>
+                <td>${e.date}</td>
+                <td><strong>${e.score}</strong></td>
+                <td>${e.correct}/${e.total}</td>
+                <td>${e.percentage}%</td>
+                <td>${Math.floor(e.timeUsed/60)}分${e.timeUsed%60}秒</td>
+                <td>${e.weakness.map(w => `<span style="color:var(--red);font-size:10px">${w.category}${w.rate}%</span>`).join(' ') || '-'}</td>
+            </tr>`).join('');
+
+        // 最近一次解析
+        const latestReview = d.latestResults.map((r, i) => `
+            <div class="mistake-item" style="border-left-color:${r.isCorrect?'var(--green)':'var(--red)'};background:${r.isCorrect?'rgba(92,184,92,0.05)':'rgba(217,83,79,0.08)'}">
+                <strong>${i+1}.</strong> ${r.question} ${r.isCorrect ? '✅' : '❌'}<br>
+                <span class="${r.isCorrect ? '' : 'wrong-answer'}">你的: ${r.studentAnswer || '未答'}</span>
+                ${!r.isCorrect ? `<span class="correct-answer">→ 正确: ${r.correctAnswer}</span>` : ''}
+                ${r.explanation ? `<div style="color:#c9d8e8;margin-top:4px;font-size:11px">📖 ${r.explanation}</div>` : ''}
+            </div>`).join('');
+
+        body.innerHTML = `
+            <div class="stats-grid">
+                <div class="stat-card"><div class="num">${d.totalExams}</div><div class="label">答题次数</div></div>
+                <div class="stat-card"><div class="num">${d.avgPercentage}%</div><div class="label">平均正确率</div></div>
+                <div class="stat-card"><div class="num">${d.bestPercentage}%</div><div class="label">最高正确率</div></div>
+                <div class="stat-card"><div class="num">${d.worstPercentage}%</div><div class="label">最低正确率</div></div>
+                <div class="stat-card"><div class="num">${d.improving ? '📈 进步中' : d.totalExams < 2 ? '—' : '📉 需关注'}</div><div class="label">趋势判断</div></div>
+            </div>
+
+            <h3 style="margin:16px 0 8px">📈 成绩趋势</h3>
+            <div class="trend-chart">${trendBars}</div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--light)">
+                <span>${d.trend[0]?.date||''}</span><span>→</span><span>${d.trend[d.trend.length-1]?.date||''}</span>
+            </div>
+
+            <h3 style="margin:16px 0 8px">⚠ 知识薄弱点</h3>
+            <div>${weakTags || '<span style="color:var(--light)">无薄弱点</span>'}</div>
+            ${d.frequentMistakes.length ? `<h3 style="margin:16px 0 8px">🔴 常错题目 TOP${d.frequentMistakes.length}</h3>${mistakes}` : ''}
+
+            <h3 style="margin:16px 0 8px">📋 最近答题记录</h3>
+            <div style="overflow-x:auto"><table><thead><tr><th>日期</th><th>分数</th><th>正确</th><th>正确率</th><th>用时</th><th>薄弱点</th></tr></thead><tbody>${recentRows}</tbody></table></div>
+
+            ${d.latestResults.length ? `<h3 style="margin:16px 0 8px">🔍 最近一次答题逐题分析</h3>${latestReview}` : ''}
+        `;
+    } catch (e) {
+        body.innerHTML = '<div class="empty">加载失败: ' + e.message + '</div>';
+    }
+}
+
+function closeModal() {
+    document.getElementById('studentModal').classList.remove('show');
+}
+document.getElementById('studentModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+
+// Init
+init();
+</script>
+</body>
+</html>

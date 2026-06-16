@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>动物药理在线答题</title>
+<style>
+:root{--bg:#0D2B4E;--bg2:#1A3D6B;--accent:#3D8CD9;--light:#6AB4E6;--white:#fff;--green:#5cb85c;--red:#d9534f;--yellow:#f5d14c;--orange:#f0ad4e}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--white);min-height:100vh}
+.container{max-width:900px;margin:0 auto;padding:20px}
+
+/* Login */
+.login-page{text-align:center;padding-top:40px}
+.login-page .logo{font-size:48px;margin-bottom:8px}
+.login-page h1{font-size:26px;margin-bottom:4px}.login-page .subtitle{color:var(--light);font-size:13px;margin-bottom:30px}
+.login-card{background:var(--bg2);border-radius:14px;padding:30px;max-width:420px;margin:0 auto;border:1px solid rgba(255,255,255,0.1)}
+.login-card .input-group{margin-bottom:16px;text-align:left}
+.login-card label{display:block;margin-bottom:4px;font-size:13px;color:var(--light)}
+.login-card input,.login-card select{width:100%;padding:10px 14px;border-radius:7px;border:1px solid var(--accent);background:var(--bg);color:var(--white);font-size:15px;outline:none}
+.login-card select{-webkit-appearance:none;appearance:none;cursor:pointer}
+.login-card select option{background:var(--bg2)}
+.btn{display:inline-block;padding:11px 28px;border-radius:7px;border:none;font-size:15px;cursor:pointer;font-weight:bold;transition:.3s;color:#fff}
+.btn-primary{background:var(--accent);width:100%}.btn-primary:hover{background:#2b7bc4;transform:translateY(-1px)}
+.btn-primary:disabled{background:#555;cursor:not-allowed;transform:none}
+.btn-sm{padding:6px 14px;font-size:12px;border-radius:5px}
+.btn-green{background:var(--green)}.btn-outline{background:transparent;border:1px solid var(--accent);color:var(--accent)}
+.info-box{background:rgba(245,209,76,0.1);border:1px solid rgba(245,209,76,0.3);border-radius:7px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--yellow);text-align:left;line-height:1.7}
+
+/* Quiz Header */
+.quiz-header{background:var(--bg2);border-radius:10px;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.1)}
+.quiz-header .info{font-size:13px;color:var(--light)}.quiz-header .info strong{color:var(--yellow)}
+.timer{font-size:22px;font-weight:bold}.timer.warning{color:var(--orange)}.timer.danger{color:var(--red);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:0.5}}
+.progress-bar{background:rgba(255,255,255,0.1);border-radius:4px;height:5px;margin-bottom:16px;overflow:hidden}
+.progress-bar .fill{background:var(--accent);height:100%;border-radius:4px;transition:width .3s}
+.question-card{background:var(--bg2);border-radius:10px;padding:20px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.08);transition:border-color .3s}
+.question-card.answered{border-color:var(--accent)}
+.question-card .q-num{display:inline-block;background:var(--accent);color:#fff;border-radius:15px;padding:2px 10px;font-size:11px;margin-bottom:8px}
+.question-card .q-category{color:var(--light);font-size:11px;margin-left:6px}
+.question-card .q-text{font-size:15px;margin-bottom:12px;line-height:1.6}
+.options{display:flex;flex-direction:column;gap:6px}
+.option{display:flex;align-items:center;padding:10px 14px;border-radius:7px;cursor:pointer;transition:.2s;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08)}
+.option:hover{background:rgba(61,140,217,0.15)}.option.selected{background:rgba(61,140,217,0.3);border-color:var(--accent)}
+.option .letter{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;margin-right:10px;font-size:13px;background:rgba(255,255,255,0.1);flex-shrink:0}
+.option.selected .letter{background:var(--accent)}.option .text{font-size:14px;line-height:1.4}
+.question-nav{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px}
+.question-nav .dot{width:30px;height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;font-weight:bold;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);transition:.2s}
+.question-nav .dot.done{background:var(--accent);border-color:var(--accent);color:#fff}
+.question-nav .dot.current{border-color:var(--yellow);border-width:2px}
+.submit-area{text-align:center;padding:20px 0 40px}
+.btn-submit{background:var(--green);padding:13px 40px;font-size:17px}.btn-submit:hover{background:#4aae4a}
+
+/* Result */
+.result-page{text-align:center;padding-top:20px}
+.result-card{background:var(--bg2);border-radius:14px;padding:32px;max-width:460px;margin:0 auto 20px;border:1px solid rgba(255,255,255,0.1)}
+.score-circle{width:120px;height:120px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0 auto 16px;border:5px solid var(--accent)}
+.score-circle .score-num{font-size:34px;font-weight:bold;color:var(--yellow)}.score-circle .score-label{font-size:11px;color:var(--light)}
+.result-detail{text-align:left;margin:16px 0;line-height:2.1;font-size:14px}.result-detail span{color:var(--yellow);font-weight:bold}
+.grade-badge{display:inline-block;padding:5px 20px;border-radius:18px;font-size:18px;font-weight:bold;margin:8px 0}
+.grade-A{background:var(--green)}.grade-B{background:var(--accent)}.grade-C{background:var(--orange)}.grade-D{background:var(--red)}
+
+/* Review */
+.review-section{max-width:700px;margin:0 auto}
+.review-card{background:var(--bg2);border-radius:8px;padding:14px;margin-bottom:10px;text-align:left;border-left:4px solid var(--red)}
+.review-card.correct{border-left-color:var(--green)}
+.review-card .r-q{font-size:14px;margin-bottom:6px;line-height:1.5}
+.review-card .r-ans{font-size:12px;color:var(--light);margin-bottom:4px}
+.review-card .r-exp{font-size:12px;color:#c9d8e8;background:rgba(61,140,217,0.1);padding:8px 10px;border-radius:5px;margin-top:6px;line-height:1.6;display:none}
+.review-card .r-exp.show{display:block}
+.review-card .exp-toggle{font-size:11px;color:var(--accent);cursor:pointer;margin-top:4px;display:inline-block}
+.review-card .exp-toggle:hover{text-decoration:underline}
+
+/* Tabs */
+.tabs{display:flex;gap:0;margin-bottom:20px;border-radius:8px;overflow:hidden}
+.tab{padding:8px 18px;cursor:pointer;font-size:13px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);transition:.2s;text-align:center;flex:1}
+.tab.active{background:var(--accent);border-color:var(--accent);font-weight:bold}.tab:hover:not(.active){background:rgba(61,140,217,0.2)}
+
+/* Leaderboard */
+.lb-table{width:100%;border-collapse:collapse;background:var(--bg2);border-radius:8px;overflow:hidden;font-size:13px}
+.lb-table th{background:var(--accent);padding:8px 10px;text-align:left;font-size:12px}
+.lb-table td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.lb-table .rank{width:30px;text-align:center;font-weight:bold}.lb-table .rank.top3{color:var(--yellow)}
+
+.weak-tag{display:inline-block;background:rgba(217,83,79,0.2);color:var(--red);padding:2px 8px;border-radius:10px;font-size:11px;margin:2px 3px}
+.filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.filter-bar select{padding:7px 10px;border-radius:5px;border:1px solid var(--accent);background:var(--bg);color:var(--white);font-size:13px}
+
+@media(max-width:600px){.container{padding:8px}.quiz-header{padding:10px 14px}.question-card{padding:14px}.question-card .q-text{font-size:13px}.option{padding:8px 10px}.option .text{font-size:12px}.score-circle{width:100px;height:100px}.score-circle .score-num{font-size:28px}.result-card{padding:20px}}
+</style>
+</head>
+<body><div class="container" id="app"></div>
+
+<script>
+const STATE={page:'login',name:'',studentClass:'',questions:[],answers:{},startTime:0,timeLimit:3600,timer:null,result:null,activeTab:'review'};
+let CLASSES=[];
+
+// ====== Render ======
+function render(){const el=document.getElementById('app');if(STATE.page==='login')el.innerHTML=renderLogin();else if(STATE.page==='quiz')el.innerHTML=renderQuiz();else if(STATE.page==='result')el.innerHTML=renderResult()}
+
+async function loadClasses(){
+    try{const r=await fetch('/api/classes');CLASSES=await r.json();render()}catch(e){CLASSES=[];render()}
+}
+
+function renderLogin(){
+    const opts=CLASSES.map(c=>`<option value="${c}">${c}</option>`).join('');
+    return`<div class="login-page">
+        <div class="logo">💊</div><h1>动物药理在线答题</h1>
+        <p class="subtitle">题库500题·随机25题·自动判分·每题5分·满分125分</p>
+        <div class="login-card">
+            <div class="info-box">📋 考试须知：共25题(5分/题=125分满分)·60分钟·提交秒出分+详细解析·及格线75分(60%)</div>
+            <div class="input-group"><label>👤 姓名</label><input type="text" id="nameInput" placeholder="输入姓名..." maxlength="20"></div>
+            <div class="input-group"><label>🏫 班级</label><select id="classSelect"><option value="">-- 请选择班级 --</option>${opts}</select></div>
+            <button class="btn btn-primary" id="startBtn" onclick="startQuiz()">开始答题</button>
+        </div>
+    </div>`;
+}
+
+async function startQuiz(){
+    const name=document.getElementById('nameInput').value.trim();
+    const cls=document.getElementById('classSelect').value;
+    if(!name){alert('请输入姓名');return}
+    if(!cls){alert('请选择班级');return}
+    const btn=document.getElementById('startBtn');btn.disabled=true;btn.textContent='加载中...';
+    try{
+        let r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,class:cls})});
+        let d=await r.json();if(!d.success)throw new Error(d.error);
+        STATE.name=d.name;STATE.studentClass=d.class;
+        r=await fetch('/api/questions');d=await r.json();
+        STATE.questions=d.questions;STATE.answers={};STATE.startTime=Date.now();STATE.timeLimit=d.config.timeLimit*60;STATE.remainingTime=STATE.timeLimit;
+        STATE.page='quiz';STATE.result=null;render();startTimer();
+    }catch(e){alert('失败: '+e.message);btn.disabled=false;btn.textContent='开始答题'}
+}
+
+function startTimer(){
+    clearInterval(STATE.timer);STATE.timer=setInterval(()=>{
+        STATE.remainingTime=Math.max(0,STATE.timeLimit-Math.round((Date.now()-STATE.startTime)/1000));
+        const el=document.getElementById('timerDisplay');if(!el)return;
+        const m=Math.floor(STATE.remainingTime/60),s=STATE.remainingTime%60;
+        el.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        el.className='timer';if(STATE.remainingTime<300)el.classList.add('danger');else if(STATE.remainingTime<600)el.classList.add('warning');
+        if(STATE.remainingTime<=0){clearInterval(STATE.timer);submitQuiz()}
+    },1000);
+}
+
+function renderQuiz(){
+    const answered=Object.keys(STATE.answers).length,total=STATE.questions.length;
+    let nav=STATE.questions.map((q,i)=>{
+        let cls=STATE.answers[q.id]?'done':'';if(i===(STATE.currentIndex||0))cls+=' current';
+        return`<div class="dot ${cls}" onclick="scrollToQ(${i})">${i+1}</div>`;
+    }).join('');
+    let qs=STATE.questions.map((q,i)=>renderQCard(q,i)).join('');
+    return`<div class="quiz-header">
+        <div class="info">👤 <strong>${STATE.name}</strong> | 🏫 ${STATE.studentClass} | 📝 <strong>${answered}/${total}</strong></div>
+        <div class="timer" id="timerDisplay">60:00</div>
+    </div>
+    <div class="progress-bar"><div class="fill" style="width:${(answered/total)*100}%"></div></div>
+    <div class="question-nav">${nav}</div>
+    <div id="qContainer">${qs}</div>
+    <div class="submit-area"><button class="btn btn-submit" onclick="confirmSubmit()">📩 提交答卷</button></div>`;
+}
+
+function renderQCard(q,i){
+    const sel=STATE.answers[q.id]||'';
+    let opts=['A','B','C','D'].map(l=>`<div class="option${sel===l?' selected':''}" onclick="selectAnswer('${q.id}','${l}')"><div class="letter">${l}</div><div class="text">${q.options[l]||''}</div></div>`).join('');
+    return`<div class="question-card${sel?' answered':''}" id="qcard-${i}">
+        <span class="q-num">第${i+1}题</span><span class="q-category">📂 ${q.category||'药理学'}</span>
+        <div class="q-text">${q.question}</div><div class="options">${opts}</div></div>`;
+}
+
+function selectAnswer(qid,letter){
+    STATE.answers[qid]=letter;const answered=Object.keys(STATE.answers).length,total=STATE.questions.length;
+    document.getElementById('qContainer').innerHTML=STATE.questions.map((q,i)=>renderQCard(q,i)).join('');
+    document.querySelector('.progress-bar .fill').style.width=(answered/total)*100+'%';
+    document.querySelector('.quiz-header .info').innerHTML=`👤 <strong>${STATE.name}</strong> | 🏫 ${STATE.studentClass} | 📝 <strong>${answered}/${total}</strong>`;
+    document.querySelectorAll('.question-nav .dot').forEach((d,i)=>{if(STATE.answers[STATE.questions[i].id])d.classList.add('done')});
+}
+function scrollToQ(i){STATE.currentIndex=i;const el=document.getElementById('qcard-'+i);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});document.querySelectorAll('.question-nav .dot').forEach((d,j)=>d.classList.toggle('current',j===i))}
+function confirmSubmit(){
+    const answered=Object.keys(STATE.answers).length,total=STATE.questions.length;
+    if(answered<total){if(!confirm(`还有${total-answered}题未作答！未答题计0分。确定提交？`))return}
+    else{if(!confirm('确定提交？提交后无法修改。'))return}
+    submitQuiz();
+}
+async function submitQuiz(){
+    clearInterval(STATE.timer);
+    try{
+        const r=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers:STATE.answers})});
+        STATE.result=await r.json();STATE.page='result';render();
+    }catch(e){alert('提交失败: '+e.message)}
+}
+
+function renderResult(){
+    const r=STATE.result,pct=r.percentage;
+    let grade,gdCls,emoji;
+    if(pct>=90){grade='A (优秀)';gdCls='grade-A';emoji='🏆'}else if(pct>=80){grade='B (良好)';gdCls='grade-B';emoji='🎉'}else if(pct>=60){grade='C (及格)';gdCls='grade-C';emoji='👍'}else{grade='D (不及格)';gdCls='grade-D';emoji='💪'}
+
+    // Weakness tags
+    let weakTags='';
+    if(r.weakness&&r.weakness.length>0)weakTags=r.weakness.map(w=>`<span class="weak-tag">${w.category} ${w.rate}%</span>`).join('');
+
+    // Review cards
+    let reviewHtml='';
+    if(r.results)reviewHtml=r.results.map((item,i)=>`
+        <div class="review-card${item.isCorrect?' correct':''}">
+            <div class="r-q"><strong>${i+1}.</strong> ${item.question} ${item.isCorrect?'✅':'❌'}</div>
+            <div class="r-ans">你的答案: <strong style="color:${item.isCorrect?'var(--green)':'var(--red)'}">${item.studentAnswer||'未答'}</strong> | 正确答案: <strong style="color:var(--green)">${item.correctAnswer}</strong></div>
+            ${item.explanation?`<div class="r-exp show">📖 <strong>解析：</strong>${item.explanation}</div>`:''}
+        </div>
+    `).join('');
+
+    return`<div class="result-page">
+        <div class="result-card">${emoji}
+            <div class="score-circle"><div class="score-num">${r.score}</div><div class="score-label">/125分</div></div>
+            <div class="grade-badge ${gdCls}">${grade}</div>
+            <div class="result-detail">
+                考生: <span>${STATE.name}</span> | 班级: <span>${STATE.studentClass}</span><br>
+                正确: <span>${r.correct}</span>/25题 | 正确率: <span>${r.percentage}%</span><br>
+                用时: <span>${Math.floor(r.timeUsed/60)}分${r.timeUsed%60}秒</span> | 结果: <span style="color:${pct>=60?'var(--green)':'var(--red)'}">${pct>=60?'✅及格':'❌不及格'}</span>
+            </div>
+            ${weakTags?`<div style="margin-top:8px;font-size:12px;color:var(--red)">⚠ 薄弱知识点：${weakTags}</div>`:''}
+        </div>
+        <button class="btn btn-primary" onclick="resetQuiz()" style="margin-bottom:6px">🔄 重新答题</button>
+        <button class="btn btn-outline btn-sm" onclick="loadHistory()" style="margin-bottom:20px">📊 我的历史成绩</button>
+        <div class="tabs" id="resultTabs">
+            <div class="tab active" onclick="switchTab('review')">📋 答题详情</div>
+            <div class="tab" onclick="switchTab('leaderboard')">🏆 排行榜</div>
+            <div class="tab" onclick="switchTab('history')">📈 历史记录</div>
+        </div>
+        <div id="tabContent">${reviewHtml}</div>
+    </div>`;
+}
+
+async function switchTab(tab){
+    STATE.activeTab=tab;
+    document.querySelectorAll('#resultTabs .tab').forEach(t=>t.classList.toggle('active',t.textContent.includes(tab==='review'?'答题':tab==='leaderboard'?'排行':'历史')));
+    const el=document.getElementById('tabContent');
+    if(tab==='review'){
+        const r=STATE.result;
+        el.innerHTML=r.results?r.results.map((item,i)=>`
+            <div class="review-card${item.isCorrect?' correct':''}">
+                <div class="r-q"><strong>${i+1}.</strong> ${item.question} ${item.isCorrect?'✅':'❌'}</div>
+                <div class="r-ans">你的: <strong style="color:${item.isCorrect?'var(--green)':'var(--red)'}">${item.studentAnswer||'未答'}</strong> | 正确: <strong style="color:var(--green)">${item.correctAnswer}</strong></div>
+                ${item.explanation?`<div class="r-exp show">📖 <strong>解析：</strong>${item.explanation}</div>`:''}
+            </div>`).join(''):'';
+    }else if(tab==='leaderboard'){
+        el.innerHTML='<div style="text-align:center;padding:20px;color:var(--light)">加载中...</div>';
+        try{
+            const r=await fetch(`/api/leaderboard?class=${encodeURIComponent(STATE.studentClass)}`);const data=await r.json();
+            if(!data.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--light)">暂无数据</div>';return}
+            el.innerHTML=`<div class="filter-bar"><span style="font-size:13px;color:var(--light)">班级：${STATE.studentClass}</span></div>
+            <table class="lb-table"><thead><tr><th>排名</th><th>姓名</th><th>班级</th><th>分数</th><th>正确率</th><th>用时</th></tr></thead><tbody>
+            ${data.map(s=>`<tr><td class="rank${s.rank<=3?' top3':''}">${s.rank<=3?['🥇','🥈','🥉'][s.rank-1]:s.rank}</td><td>${s.name}</td><td>${s.class}</td><td>${s.score}</td><td>${s.percentage}%</td><td>${Math.floor(s.timeUsed/60)}分${s.timeUsed%60}秒</td></tr>`).join('')}
+            </tbody></table>`;
+        }catch(e){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--red)">加载失败</div>'}
+    }else if(tab==='history'){
+        el.innerHTML='<div style="text-align:center;padding:20px;color:var(--light)">加载中...</div>';
+        try{
+            const r=await fetch('/api/student/history');const data=await r.json();
+            if(!data.history||!data.history.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--light)">暂无历史记录</div>';return}
+            el.innerHTML=`<div style="background:var(--bg2);padding:14px;border-radius:8px;margin-bottom:12px;text-align:center">
+                📊 共<strong style="color:var(--yellow)">${data.totalExams}</strong>次答题 | 平均正确率: <strong style="color:var(--yellow)">${data.avgPercentage}%</strong> | 最高: <strong style="color:var(--yellow)">${data.bestPercentage}%</strong></div>
+            <table class="lb-table"><thead><tr><th>日期</th><th>分数</th><th>正确率</th><th>用时</th><th>薄弱点</th></tr></thead><tbody>
+            ${data.history.map(h=>`<tr><td>${h.date}</td><td>${h.score}</td><td>${h.percentage}%</td><td>${Math.floor(h.timeUsed/60)}分${h.timeUsed%60}秒</td><td>${h.weakness?h.weakness.map(w=>`<span class="weak-tag">${w.category} ${w.rate}%</span>`).join(''):'无'}</td></tr>`).join('')}
+            </tbody></table>`;
+        }catch(e){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--red)">加载失败</div>'}
+    }
+}
+
+function resetQuiz(){STATE.page='login';STATE.questions=[];STATE.answers={};STATE.result=null;clearInterval(STATE.timer);render()}
+async function loadHistory(){document.querySelectorAll('#resultTabs .tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('#resultTabs .tab')[2].classList.add('active');await switchTab('history')}
+
+// Init
+loadClasses();
+</script>
+</body>
+</html>
